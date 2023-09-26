@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">tailscaled</string>
+    <string name="action_settings">Settings</string>
+    <string name="first_fragment_label">Tailscaled</string>
+    <string name="next">Start</string>
+
+    <string name="lorem_ipsum">
+        ssh: 127.0.0.1:1056\n
+        socks5: 127.0.0.1:1055
+    </string>
+</resources>
