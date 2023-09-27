@@ -6,7 +6,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,13 +21,13 @@ import (
 )
 
 func setWinsize(f *os.File, w, h int) {
-	syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
+	_, _, _ = syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), uintptr(syscall.TIOCSWINSZ),
 		uintptr(unsafe.Pointer(&struct{ h, w, x, y uint16 }{uint16(h), uint16(w), 0, 0})))
 }
 
 var cmd *exec.Cmd
 var sshserver *ssh.Server
-var ExecPath string
+var PC pathControl
 
 type Closer interface {
 	Close() error
@@ -40,18 +40,18 @@ func Start(sshserver, execPath, sockPath, statePath string, closeCallBack Closer
 		return
 	}
 
-	ExecPath = execPath
+	PC = newPathControl(execPath, sockPath, statePath)
 
 	go func() {
-		if err := sshServer(sshserver, filepath.Dir(sockPath)); err != nil {
-			log.Println(err)
+		if err := sshServer(sshserver, PC); err != nil {
+			slog.Error("ssh server", "err", err)
 		}
 	}()
 
 	go func() {
-		err := tailscaledCmd(execPath, sockPath, statePath)
+		err := tailscaledCmd(PC)
 		if err != nil {
-			log.Println(err)
+			slog.Error("tailscaled cmd", "err", err)
 		}
 
 		Stop()
@@ -63,46 +63,86 @@ func Start(sshserver, execPath, sockPath, statePath string, closeCallBack Closer
 }
 
 func Stop() {
-	if cmd != nil && cmd.Process != nil {
-		cmd.Process.Kill()
-		cmd = nil
-	}
-
 	if sshserver != nil {
+		slog.Info("stop ssh server")
 		sshserver.Close()
 		sshserver = nil
 	}
+
+	if cmd != nil && cmd.Process != nil {
+		slog.Info("stop tailscaled cmd")
+		_ = cmd.Process.Kill()
+		cmd = nil
+	}
+
 }
 
-func tailscaledCmd(execPath string, socketdir, statedir string) error {
-	dataDir := filepath.Dir(socketdir)
-	execDir := filepath.Dir(execPath)
+func rm(path ...string) {
+	if len(path) == 0 {
+		return
+	}
 
-	data, err := exec.Command("/system/bin/rm", "-rf",
-		filepath.Join(dataDir, "tailscale"),
-		filepath.Join(dataDir, "tailscaled")).CombinedOutput()
-	log.Println("rm", string(data), err)
-	data, err = exec.Command("/system/bin/ln", "-s", filepath.Join(execDir, "libtailscale.so"),
-		filepath.Join(dataDir, "tailscale")).CombinedOutput()
-	log.Println("ln tailscale", string(data), err)
-	data, err = exec.Command("/system/bin/ln", "-s", filepath.Join(execDir, "libtailscaled.so"),
-		filepath.Join(dataDir, "tailscaled")).CombinedOutput()
-	log.Println("ln tailscaled", string(data), err)
+	args := []string{"-rf"}
+	args = append(args, path...)
+	data, err := exec.Command("/system/bin/rm", args...).CombinedOutput()
+	slog.Info("rm", "cmd", args, "output", string(data), "err", err)
+}
+
+func ln(src, dst string) {
+	cmd := exec.Command("/system/bin/ln", "-s", src, dst)
+	data, err := cmd.CombinedOutput()
+	slog.Info("ln", "cmd", cmd.String(), "output", string(data), "err", err)
+}
+
+type pathControl struct {
+	execPath   string
+	statePath  string
+	socketPath string
+	execDir    string
+	dataDir    string
+}
+
+func newPathControl(execPath, socketPath, statePath string) pathControl {
+	return pathControl{
+		execPath:   execPath,
+		statePath:  statePath,
+		socketPath: socketPath,
+		execDir:    filepath.Dir(execPath),
+		dataDir:    filepath.Dir(socketPath),
+	}
+}
+
+func (p pathControl) TailscaledSo() string { return p.execPath }
+func (p pathControl) Tailscaled() string   { return filepath.Join(p.dataDir, "tailscaled") }
+func (p pathControl) TailscaleSo() string  { return filepath.Join(p.execDir, "libtailscale.so") }
+func (p pathControl) Tailscale() string    { return filepath.Join(p.dataDir, "tailscale") }
+func (p pathControl) DataDir(s ...string) string {
+	if len(s) == 0 {
+		return p.dataDir
+	}
+	return filepath.Join(append([]string{p.dataDir}, s...)...)
+}
+func (p pathControl) Socket() string { return p.socketPath }
+func (p *pathControl) State() string { return p.statePath }
+
+func tailscaledCmd(p pathControl) error {
+
+	rm(p.Tailscale(), p.Tailscaled())
+	ln(p.TailscaleSo(), p.Tailscale())
+	ln(p.TailscaledSo(), p.Tailscaled())
 
 	cmd = exec.Command(
-		execPath,
+		p.TailscaledSo(),
 		"--tun=userspace-networking",
 		"--socks5-server=:1055",
 		"--outbound-http-proxy-listen=:1057",
-		fmt.Sprintf("--statedir=%s", statedir),
-		fmt.Sprintf("--socket=%s", socketdir),
+		fmt.Sprintf("--statedir=%s", p.State()),
+		fmt.Sprintf("--socket=%s", p.Socket()),
 	)
-	os.Setenv("TS_LOGS_DIR", filepath.Join(filepath.Dir(socketdir), "logs"))
+	cmd.Dir = p.DataDir()
 	cmd.Env = []string{
-		fmt.Sprintf("TS_LOGS_DIR=%s/logs", filepath.Dir(socketdir)),
+		fmt.Sprintf("TS_LOGS_DIR=%s/logs", p.DataDir()),
 	}
-	cmd.Dir = filepath.Dir(socketdir)
-	log.Println(os.Getenv("TS_LOGS_DIR"))
 
 	errChan := make(chan error)
 	defer close(errChan)
@@ -120,7 +160,7 @@ func tailscaledCmd(execPath string, socketdir, statedir string) error {
 		s := bufio.NewScanner(stdOut)
 
 		for s.Scan() {
-			log.Println(s.Text())
+			slog.Info(s.Text())
 		}
 	}()
 
@@ -141,7 +181,7 @@ func tailscaledCmd(execPath string, socketdir, statedir string) error {
 		s := bufio.NewScanner(stdOut)
 
 		for s.Scan() {
-			log.Println(s.Text())
+			slog.Info(s.Text())
 		}
 	}()
 
@@ -152,7 +192,7 @@ func tailscaledCmd(execPath string, socketdir, statedir string) error {
 	return cmd.Run()
 }
 
-func sshServer(addr, datadir string) error {
+func sshServer(addr string, pc pathControl) error {
 	p, _ := pem.Decode([]byte(PrivateKey))
 	key, _ := x509.ParsePKCS1PrivateKey(p.Bytes)
 
@@ -168,34 +208,37 @@ func sshServer(addr, datadir string) error {
 			"sftp": sftpHandler,
 		},
 		Handler: func(s ssh.Session) {
-			ptyHandler(s, datadir)
+			ptyHandler(s, pc)
 		},
 	}
 
 	sshserver = &ssh_server
 
-	log.Println("starting ssh server on", addr)
-	log.Fatal(ssh_server.ListenAndServe())
+	slog.Info("starting ssh server", "host", addr)
+	slog.Info("ssh server", "err", ssh_server.ListenAndServe())
 	return nil
 }
 
-func ptyHandler(s ssh.Session, workDir string) {
-	s.Write([]byte{'\n'})
-	s.Write(fmt.Appendf(nil, "tailscaled path is %s\n", ExecPath))
-	wd, _ := os.Getwd()
-	s.Write(fmt.Appendf(nil, "current path is %s\n", wd))
-	s.Write([]byte{'\n'})
+var ptyWelcome = `
+Welcome to Tailscaled SSH
+	Tailscaled: %s
+	Work Dir: %s
+	RemoteAddr: %s
+`
 
-	log.Println("new session", s.RemoteAddr())
+func ptyHandler(s ssh.Session, pc pathControl) {
+	_, _ = fmt.Fprintf(s, ptyWelcome, pc.TailscaledSo(), pc.DataDir(), s.RemoteAddr())
+
+	slog.Info("new pty session", "remote addr", s.RemoteAddr())
 
 	cmd := exec.Command("/system/bin/sh")
-	cmd.Dir = workDir
+	cmd.Dir = pc.DataDir()
 	ptyReq, winCh, isPty := s.Pty()
 	if isPty {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("TERM=%s", ptyReq.Term))
 		f, err := pty.Start(cmd)
 		if err != nil {
-			log.Println("start pty failed", err)
+			slog.Error("start pty", "err", err)
 			return
 		}
 		go func() {
@@ -204,22 +247,22 @@ func ptyHandler(s ssh.Session, workDir string) {
 			}
 		}()
 		go func() {
-			io.Copy(f, s) // stdin
+			_, _ = io.Copy(f, s) // stdin
 			f.Close()
 		}()
-		io.Copy(s, f) // stdout
+		_, _ = io.Copy(s, f) // stdout
 		s.Close()
-		cmd.Wait()
-		log.Println("session exit", s.RemoteAddr())
+		err = cmd.Wait()
+		slog.Info("session exit", "remote addr", s.RemoteAddr(), "wait error", err)
 	} else {
-		io.WriteString(s, "No PTY requested.\n")
-		s.Exit(1)
+		_, _ = io.WriteString(s, "No PTY requested.\n")
+		_ = s.Exit(1)
 	}
 }
 
 // sftpHandler handler for SFTP subsystem
 func sftpHandler(sess ssh.Session) {
-	log.Println("new sftp session from", sess.RemoteAddr())
+	slog.Info("new sftp session", "remote addr", sess.RemoteAddr())
 	debugStream := io.Discard
 	serverOptions := []sftp.ServerOption{
 		sftp.WithDebug(debugStream),
@@ -229,17 +272,17 @@ func sftpHandler(sess ssh.Session) {
 		serverOptions...,
 	)
 	if err != nil {
-		log.Printf("sftp server init error: %s\n", err)
+		slog.Error("sftp server init", "err", err)
 		return
 	}
 	if err := server.Serve(); err == io.EOF {
 		server.Close()
-		fmt.Println("sftp client exited session.")
+		slog.Info("sftp client exited session.")
 	} else if err != nil {
-		fmt.Println("sftp server completed with error:", err)
+		slog.Error("sftp server completed", "err", err)
 	}
 
-	log.Println("sftp session exited", sess.RemoteAddr())
+	slog.Info("sftp session exited", "remote addr", sess.RemoteAddr())
 }
 
 var PrivateKey = `-----BEGIN RSA PRIVATE KEY-----
