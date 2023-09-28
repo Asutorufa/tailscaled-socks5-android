@@ -12,11 +12,11 @@ import android.os.IBinder
 import android.os.Message
 import android.os.Messenger
 import android.util.Log
-import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.RequiresApi
+import androidx.fragment.app.Fragment
 import io.github.asutorufa.tailscaled.databinding.FragmentFirstBinding
 
 /**
@@ -92,13 +92,15 @@ class FirstFragment : Fragment() {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        activity?.registerReceiver(
-            bReceiver,
-            IntentFilter().apply {
-                addAction("START")
-                addAction("STOP")
-            },
-        )
+
+        val intentFilter =  IntentFilter().apply {
+            addAction("START")
+            addAction("STOP")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            activity?.registerReceiver(bReceiver,intentFilter, Context.RECEIVER_EXPORTED)
+        else activity?.registerReceiver(bReceiver, intentFilter)
+
         // Bind to the service
         Intent(activity, TailscaledService::class.java).also { intent ->
             activity?.bindService(intent, mConnection, Context.BIND_AUTO_CREATE)
