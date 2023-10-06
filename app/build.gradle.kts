@@ -29,13 +29,6 @@ android {
         }
     }
 
-    sourceSets {
-        getByName("main") {
-            jniLibs.srcDir("src/main/jniLibs")
-            jni.srcDirs()
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = false
