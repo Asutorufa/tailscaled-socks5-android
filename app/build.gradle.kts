@@ -29,13 +29,40 @@ android {
         }
     }
 
+    signingConfigs {
+        if (System.getenv("KEYSTORE_PATH") != null)
+            create("releaseConfig") {
+                storeFile = file(System.getenv("KEYSTORE_PATH"))
+                keyAlias = System.getenv("KEY_ALIAS")
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+    }
+
+    this.buildOutputs.all {
+        val variantOutputImpl = this as com.android.build.gradle.internal.api.BaseVariantOutputImpl
+        val variantName: String = variantOutputImpl.name
+        variantOutputImpl.outputFileName = "tailscaled-${variantName}.apk"
+    }
+
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Enables code shrinking, obfuscation, and optimization for only
+            // your project's release build type.
+            isMinifyEnabled = true
+
+            // Enables resource shrinking, which is performed by the
+            // Android Gradle plugin.
+            isShrinkResources = true
+
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+
+
+            if (System.getenv("KEYSTORE_PATH") != null)
+                signingConfig = signingConfigs.getByName("releaseConfig")
         }
     }
     compileOptions {
