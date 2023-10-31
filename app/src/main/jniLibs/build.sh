@@ -1,5 +1,5 @@
 current=$(dirname "$(readlink -f "$0")")
-cd tailscale
+cd ${HOME}/Documents/Programming/tailscale
 if [ "${ANDROID_NDK_HOME}" = "" ]; then
 	export ANDROID_NDK_HOME="/opt/android-ndk"
 fi
