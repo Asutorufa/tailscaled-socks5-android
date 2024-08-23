@@ -1,3 +1,4 @@
+set -x
 current=$(dirname "$(readlink -f "$0")")
 cd ${HOME}/Documents/Programming/tailscale
 if [ "${ANDROID_NDK_HOME}" = "" ]; then
