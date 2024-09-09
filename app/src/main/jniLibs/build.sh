@@ -1,6 +1,7 @@
 set -x
 current=$(dirname "$(readlink -f "$0")")
-cd ${HOME}/Documents/Programming/tailscale
+CORE_HOME=${CORE_HOME:-${HOME}/Documents/Programming/tailscale}
+cd $CORE_HOME
 if [ "${ANDROID_NDK_HOME}" = "" ]; then
 	export ANDROID_NDK_HOME="/opt/android-ndk"
 fi

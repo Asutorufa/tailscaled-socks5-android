@@ -1,3 +1,7 @@
+@file:Suppress("UNUSED_EXPRESSION")
+
+import com.android.build.api.dsl.Packaging
+
 @Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
     alias(libs.plugins.androidApplication)
@@ -68,6 +72,11 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+    }
+    fun Packaging.() {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
     kotlinOptions {
         jvmTarget = "1.8"

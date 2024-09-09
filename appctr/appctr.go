@@ -35,29 +35,41 @@ type Closer interface {
 
 func IsRunning() bool { return cmd != nil && cmd.Process != nil }
 
-func Start(sshserver, execPath, sockPath, statePath string, closeCallBack Closer) {
+type StartOptions struct {
+	SSHServer     string
+	ExecPath      string
+	SocketPath    string
+	StatePath     string
+	Socks5Server  string
+	CloseCallBack Closer
+}
+
+func Start(opt *StartOptions) {
 	if IsRunning() {
 		return
 	}
 
-	PC = newPathControl(execPath, sockPath, statePath)
+	if opt.Socks5Server == "" {
+		opt.Socks5Server = ":1055"
+	}
+	PC = newPathControl(opt.ExecPath, opt.SocketPath, opt.StatePath)
 
 	go func() {
-		if err := sshServer(sshserver, PC); err != nil {
+		if err := sshServer(opt.SSHServer, PC); err != nil {
 			slog.Error("ssh server", "err", err)
 		}
 	}()
 
 	go func() {
-		err := tailscaledCmd(PC)
+		err := tailscaledCmd(PC, opt.Socks5Server)
 		if err != nil {
 			slog.Error("tailscaled cmd", "err", err)
 		}
 
 		Stop()
 
-		if closeCallBack != nil {
-			closeCallBack.Close()
+		if opt.CloseCallBack != nil {
+			opt.CloseCallBack.Close()
 		}
 	}()
 }
@@ -125,7 +137,7 @@ func (p pathControl) DataDir(s ...string) string {
 func (p pathControl) Socket() string { return p.socketPath }
 func (p *pathControl) State() string { return p.statePath }
 
-func tailscaledCmd(p pathControl) error {
+func tailscaledCmd(p pathControl, socks5host string) error {
 
 	rm(p.Tailscale(), p.Tailscaled())
 	ln(p.TailscaleSo(), p.Tailscale())
@@ -134,7 +146,7 @@ func tailscaledCmd(p pathControl) error {
 	cmd = exec.Command(
 		p.TailscaledSo(),
 		"--tun=userspace-networking",
-		"--socks5-server=:1055",
+		"--socks5-server="+socks5host,
 		"--outbound-http-proxy-listen=:1057",
 		fmt.Sprintf("--statedir=%s", p.State()),
 		fmt.Sprintf("--socket=%s", p.Socket()),

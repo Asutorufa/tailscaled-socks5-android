@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
@@ -15,15 +16,19 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.annotation.RequiresApi
+import android.widget.TextView
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import io.github.asutorufa.tailscaled.databinding.FragmentFirstBinding
+
 
 /**
  * A simple [Fragment] subclass as the default destination in the navigation.
  */
 class FirstFragment : Fragment() {
     private lateinit var binding: FragmentFirstBinding
+
+    private lateinit var sharedPreferences: SharedPreferences
 
     private var isRunning = false
     private val bReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -34,11 +39,15 @@ class FirstFragment : Fragment() {
                 "START" -> {
                     binding.buttonFirst.text = "Stop"
                     isRunning = true
+                    binding.socks5.isEnabled = false
+                    binding.sshserver.isEnabled = false
                 }
 
                 "STOP" -> {
                     binding.buttonFirst.text = "Start"
                     isRunning = false
+                    binding.socks5.isEnabled = true
+                    binding.sshserver.isEnabled = true
                 }
             }
         }
@@ -86,24 +95,62 @@ class FirstFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         binding = FragmentFirstBinding.inflate(inflater, container, false)
+
         return binding.root
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        sharedPreferences = requireActivity().getSharedPreferences("appctr", Context.MODE_PRIVATE)
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        binding.socks5.setText(
+            sharedPreferences.getString("socks5", "0.0.0.0:1055"),
+            TextView.BufferType.EDITABLE,
+        )
+        binding.sshserver.setText(
+            sharedPreferences.getString("sshserver", "0.0.0.0:1056"),
+            TextView.BufferType.EDITABLE,
+        )
+    }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        val intentFilter =  IntentFilter().apply {
+        val intentFilter = IntentFilter().apply {
             addAction("START")
             addAction("STOP")
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-            activity?.registerReceiver(bReceiver,intentFilter, Context.RECEIVER_EXPORTED)
+            activity?.registerReceiver(bReceiver, intentFilter, Context.RECEIVER_EXPORTED)
         else activity?.registerReceiver(bReceiver, intentFilter)
 
         // Bind to the service
         Intent(activity, TailscaledService::class.java).also { intent ->
             activity?.bindService(intent, mConnection, Context.BIND_AUTO_CREATE)
+        }
+
+
+
+            binding.socks5.doAfterTextChanged { text ->
+            sharedPreferences.edit().apply {
+                putString("socks5", text.toString())
+                commit()
+            }
+        }
+
+        binding.sshserver.doAfterTextChanged { text ->
+            sharedPreferences.edit().apply {
+                putString("sshserver", text.toString())
+                commit()
+            }
         }
 
         binding.buttonFirst.setOnClickListener {

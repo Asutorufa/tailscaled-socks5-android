@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -16,14 +17,18 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.getSystemService
 import appctr.Appctr
+import appctr.Closer
+import appctr.StartOptions
 
 
 class TailscaledService : Service() {
     private val notification by lazy { application.getSystemService<NotificationManager>()!! }
+    private lateinit var sharedPreferences: SharedPreferences
 
     override fun onCreate() {
         super.onCreate()
         mMessenger = Messenger(IncomingHandler(this))
+        sharedPreferences = getSharedPreferences("appctr", Context.MODE_PRIVATE)
     }
 
     private fun startNotification() {
@@ -74,7 +79,7 @@ class TailscaledService : Service() {
     }
 
     private fun stopMe() {
-        if (!Appctr.isRunning()) return
+        Log.d(TAG, "try to stopMe")
         stopForeground(STOP_FOREGROUND_REMOVE)
         Appctr.stop()
         stopSelf()
@@ -94,7 +99,7 @@ class TailscaledService : Service() {
         private val applicationContext: Context = context.applicationContext
     ) : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
-            Log.d(TAG,"receive message: ${msg.what}")
+            Log.d(TAG, "receive message: ${msg.what}")
             when (msg.what) {
                 MSG_SAY_HELLO -> {
                     applicationContext.sendBroadcast(Intent(if (Appctr.isRunning()) "START" else "STOP"))
@@ -111,16 +116,14 @@ class TailscaledService : Service() {
         }
     }
 
-    private fun start() {
-        Appctr.start(
-            "0.0.0.0:1056",
-            "${applicationInfo.nativeLibraryDir}/libtailscaled.so",
-            "${applicationInfo.dataDir}/tailscaled.sock",
-            "${applicationInfo.dataDir}/state",
-        ) {
-            stopMe()
-        }
-    }
+    private fun start() = Appctr.start(StartOptions().apply {
+        socks5Server = sharedPreferences.getString("socks5", "0.0.0.0:1055")
+        sshServer = sharedPreferences.getString("sshserver", "0.0.0.0:1056")
+        execPath = "${applicationInfo.nativeLibraryDir}/libtailscaled.so"
+        socketPath = "${applicationInfo.dataDir}/tailscaled.sock"
+        statePath = "${applicationInfo.dataDir}/state"
+        closeCallBack = Closer { stopMe() }
+    })
 
 
     companion object {
