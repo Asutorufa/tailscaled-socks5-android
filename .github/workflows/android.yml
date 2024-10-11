@@ -27,6 +27,9 @@ jobs:
         with:
           check-latest: true
           go-version-file: "tailscale/go.mod"
+          cache-dependency-path: |
+            tailscale/go.sum
+            appctr/go.sum
 
       - name: set up JDK 17
         uses: actions/setup-java@v4
