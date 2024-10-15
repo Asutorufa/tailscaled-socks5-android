@@ -140,11 +140,12 @@ func (p *pathControl) State() string { return p.statePath }
 func tailscaledCmd(p pathControl, socks5host string) error {
 
 	rm(p.Tailscale(), p.Tailscaled())
-	ln(p.TailscaleSo(), p.Tailscale())
+	// see: https://tailscale.com/kb/1207/small-tailscale
+	ln(p.TailscaledSo(), p.Tailscale())
 	ln(p.TailscaledSo(), p.Tailscaled())
 
 	cmd = exec.Command(
-		p.TailscaledSo(),
+		p.Tailscaled(),
 		"--tun=userspace-networking",
 		"--socks5-server="+socks5host,
 		"--outbound-http-proxy-listen=:1057",
