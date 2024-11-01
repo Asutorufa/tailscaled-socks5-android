@@ -3,7 +3,7 @@ module appctr
 go 1.21.1
 
 require (
-	github.com/creack/pty v1.1.23
+	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.7
 	github.com/pkg/sftp v1.13.7
 	golang.org/x/crypto v0.28.0
