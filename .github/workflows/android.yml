@@ -26,7 +26,8 @@ jobs:
         uses: actions/setup-go@v5
         with:
           check-latest: true
-          go-version-file: "tailscale/go.mod"
+          go-version: 'stable'
+          # go-version-file: "tailscale/go.mod"
           cache-dependency-path: |
             tailscale/go.sum
             appctr/go.sum
