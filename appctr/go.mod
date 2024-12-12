@@ -4,9 +4,9 @@ go 1.21.1
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/gliderlabs/ssh v0.3.7
+	github.com/gliderlabs/ssh v0.3.8
 	github.com/pkg/sftp v1.13.7
-	golang.org/x/crypto v0.30.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/mobile v0.0.0-20230922142353-e2f452493d57
 )
 
