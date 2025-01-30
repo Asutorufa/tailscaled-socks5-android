@@ -39,12 +39,28 @@
             android:inputType="text"
             android:text="SSH"
             app:layout_constraintTop_toBottomOf="@+id/socks5"
-            app:layout_constraintBottom_toTopOf="@+id/button_first"
+            app:layout_constraintBottom_toTopOf="@+id/authkey"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             tools:layout_editor_absoluteX="81dp"
             tools:layout_editor_absoluteY="61dp" />
 
+        <EditText
+            android:id="@+id/authkey"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="16dp"
+            android:autofillHints="tskey-xxxx"
+            android:ems="10"
+            android:inputType="text"
+            android:text="AuthKey"
+            app:layout_constraintTop_toBottomOf="@+id/sshserver"
+            app:layout_constraintBottom_toTopOf="@+id/button_first"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:layout_editor_absoluteX="81dp"
+            tools:layout_editor_absoluteY="61dp" />
 <!--        <TextView-->
 <!--            android:id="@+id/textview_first"-->
 <!--            android:layout_width="match_parent"-->

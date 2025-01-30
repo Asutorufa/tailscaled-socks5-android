@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"github.com/creack/pty"
@@ -42,6 +43,7 @@ type StartOptions struct {
 	StatePath     string
 	Socks5Server  string
 	CloseCallBack Closer
+	AuthKey       string
 }
 
 func Start(opt *StartOptions) {
@@ -52,13 +54,16 @@ func Start(opt *StartOptions) {
 	if opt.Socks5Server == "" {
 		opt.Socks5Server = ":1055"
 	}
+
 	PC = newPathControl(opt.ExecPath, opt.SocketPath, opt.StatePath)
 
-	go func() {
-		if err := sshServer(opt.SSHServer, PC); err != nil {
-			slog.Error("ssh server", "err", err)
-		}
-	}()
+	if opt.SSHServer != "" {
+		go func() {
+			if err := sshServer(opt.SSHServer, PC); err != nil {
+				slog.Error("ssh server", "err", err)
+			}
+		}()
+	}
 
 	go func() {
 		err := tailscaledCmd(PC, opt.Socks5Server)
@@ -72,8 +77,42 @@ func Start(opt *StartOptions) {
 			opt.CloseCallBack.Close()
 		}
 	}()
+
+	if opt.AuthKey != "" {
+		go registerMachineWithAuthKey(PC, opt.AuthKey)
+	}
 }
 
+func registerMachineWithAuthKey(PC pathControl, authKey string) {
+	count := 0
+	for count <= 5 {
+		_, err := os.Stat(PC.Socket())
+		if err != nil {
+			count++
+			time.Sleep(time.Second)
+			continue
+		}
+
+		data, err := exec.Command(
+			PC.Tailscale(),
+			"--socket",
+			PC.Socket(),
+			"up",
+			"--auth-key",
+			authKey,
+			"--timeout",
+			"10s",
+		).CombinedOutput()
+		slog.Info("tailscale up", "output", string(data), "err", err)
+		if err != nil {
+			count++
+			time.Sleep(time.Second)
+			continue
+		}
+
+		break
+	}
+}
 func Stop() {
 	if sshserver != nil {
 		slog.Info("stop ssh server")
@@ -81,12 +120,19 @@ func Stop() {
 		sshserver = nil
 	}
 
-	if cmd != nil && cmd.Process != nil {
-		slog.Info("stop tailscaled cmd")
-		_ = cmd.Process.Kill()
-		cmd = nil
-	}
+	x := cmd
+	cmd = nil
 
+	if x != nil && x.Process != nil {
+		slog.Info("stop tailscaled cmd")
+		_ = x.Process.Signal(syscall.SIGTERM)
+		go func() {
+			time.Sleep(time.Second * 5)
+			if x.Process != nil {
+				_ = x.Process.Kill()
+			}
+		}()
+	}
 }
 
 func rm(path ...string) {

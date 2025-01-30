@@ -41,6 +41,7 @@ class FirstFragment : Fragment() {
                     isRunning = true
                     binding.socks5.isEnabled = false
                     binding.sshserver.isEnabled = false
+                    binding.authkey.isEnabled = false
                 }
 
                 "STOP" -> {
@@ -48,6 +49,7 @@ class FirstFragment : Fragment() {
                     isRunning = false
                     binding.socks5.isEnabled = true
                     binding.sshserver.isEnabled = true
+                    binding.authkey.isEnabled = true
                 }
             }
         }
@@ -119,6 +121,10 @@ class FirstFragment : Fragment() {
             sharedPreferences.getString("sshserver", "0.0.0.0:1056"),
             TextView.BufferType.EDITABLE,
         )
+        binding.authkey.setText(
+            sharedPreferences.getString("authkey", ""),
+            TextView.BufferType.EDITABLE,
+        )
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -139,7 +145,7 @@ class FirstFragment : Fragment() {
 
 
 
-            binding.socks5.doAfterTextChanged { text ->
+        binding.socks5.doAfterTextChanged { text ->
             sharedPreferences.edit().apply {
                 putString("socks5", text.toString())
                 commit()
@@ -151,6 +157,14 @@ class FirstFragment : Fragment() {
                 putString("sshserver", text.toString())
                 commit()
             }
+        }
+
+        binding.authkey.doAfterTextChanged { text ->
+            sharedPreferences.edit().apply {
+                putString("authkey", text.toString())
+                commit()
+            }
+
         }
 
         binding.buttonFirst.setOnClickListener {

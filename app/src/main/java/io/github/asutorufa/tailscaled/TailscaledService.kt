@@ -119,6 +119,7 @@ class TailscaledService : Service() {
     private fun start() = Appctr.start(StartOptions().apply {
         socks5Server = sharedPreferences.getString("socks5", "0.0.0.0:1055")
         sshServer = sharedPreferences.getString("sshserver", "0.0.0.0:1056")
+        authKey = sharedPreferences.getString("authkey", "")
         execPath = "${applicationInfo.nativeLibraryDir}/libtailscaled.so"
         socketPath = "${applicationInfo.dataDir}/tailscaled.sock"
         statePath = "${applicationInfo.dataDir}/state"
