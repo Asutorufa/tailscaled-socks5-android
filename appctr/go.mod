@@ -6,7 +6,7 @@ require (
 	github.com/creack/pty v1.1.24
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/pkg/sftp v1.13.7
-	golang.org/x/crypto v0.32.0
+	golang.org/x/crypto v0.33.0
 	golang.org/x/mobile v0.0.0-20250210185054-b38b8813d607
 )
 
