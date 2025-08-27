@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "io.github.asutorufa.tailscaled"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "io.github.asutorufa.tailscaled"
         minSdk = 24
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
