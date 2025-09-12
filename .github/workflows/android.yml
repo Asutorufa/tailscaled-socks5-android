@@ -23,7 +23,7 @@ jobs:
           git clone -b my https://github.com/Asutorufa/tailscale.git
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           check-latest: true
           go-version: 'stable'
