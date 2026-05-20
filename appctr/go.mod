@@ -7,7 +7,7 @@ require (
 	github.com/gliderlabs/ssh v0.3.8
 	github.com/pkg/sftp v1.13.10
 	golang.org/x/crypto v0.46.0
-	golang.org/x/mobile v0.0.0-20260514233045-7de0a8fa7f4d
+	golang.org/x/mobile v0.0.0-20260520154334-0e4426e1883d
 )
 
 require (
